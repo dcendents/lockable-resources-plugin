@@ -1,6 +1,5 @@
 package org.jenkins.plugins.lockableresources.step;
 
-import com.google.inject.Inject;
 import hudson.EnvVars;
 import hudson.Util;
 import hudson.model.Run;
@@ -14,111 +13,118 @@ import org.jenkins.plugins.lockableresources.Utils;
 import org.jenkins.plugins.lockableresources.resources.LockableResource;
 import org.jenkins.plugins.lockableresources.resources.LockableResourcesManager;
 import org.jenkins.plugins.lockableresources.resources.RequiredResources;
-import org.jenkinsci.plugins.workflow.steps.AbstractStepExecutionImpl;
 import org.jenkinsci.plugins.workflow.steps.BodyExecutionCallback;
 import org.jenkinsci.plugins.workflow.steps.StepContext;
-import org.jenkinsci.plugins.workflow.steps.StepContextParameter;
+import org.jenkinsci.plugins.workflow.steps.StepExecution;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * Manage LockStep execution during the pipeline process
  *
  * @author
  */
-public class LockStepExecution extends AbstractStepExecutionImpl {
-    private static final long serialVersionUID = 1L;
-    @Inject(optional = true)
-    private LockStep step;
-    @StepContextParameter
-    private transient Run<?, ?> run;
-    @StepContextParameter
-    protected transient TaskListener listener = null;
-    private static final Logger LOGGER = Logger.getLogger(LockStepExecution.class.getName());
+@SuppressFBWarnings(value="SE_TRANSIENT_FIELD_NOT_RESTORED", justification="Contextual fields used only in start(); no onResume needed")
+public class LockStepExecution extends StepExecution {
+	private static final long serialVersionUID = 1L;
+	private transient LockStep step;
+	private transient Run<?, ?> run;
+	private transient TaskListener listener = null;
+	private static final Logger LOGGER = Logger.getLogger(LockStepExecution.class.getName());
 
-    @Override
-    public boolean start() throws Exception {
-        LockableResourcesManager manager = LockableResourcesManager.get();
-        EnvVars env = Utils.getEnvVars(run, listener);
+	LockStepExecution(StepContext context, LockStep step) throws Exception {
+		super(context);
+		this.step = step;
+		// Or just delete these fields and inline:
+		listener = context.get(TaskListener.class);
+		run = context.get(Run.class);
+	}
 
-        for(RequiredResources rr : step.requiredResourcesList) {
-            // create missing resources only when specified explicitly
-            String rsrcs = rr.getExpandedResources(env);
-            if(Util.fixEmpty(rsrcs) != null) {
-                for(String resource : Utils.splitLabels(rsrcs)) {
-                    if(manager.createResource(resource)) {
-                        listener.getLogger().println("Resource [" + rsrcs + "] did not exist. Created.");
-                    }
-                }
-            }
-        }
+	@Override
+	public boolean start() throws Exception {
+		LockableResourcesManager manager = LockableResourcesManager.get();
+		EnvVars env = Utils.getEnvVars(run, listener);
 
-        listener.getLogger().println("Trying to acquire lock on [" + step.requiredResourcesList + "]");
-        // Determine if there are enough resources available to proceed
-        // Function 'proceed' is called inside lock if execution is possible
-        // Else, the task is queued for later retry
-        LockableResourcesManager.get().lockOrQueueForLater(step, getContext());
-        return false; //asynchronous step execution
-    }
+		for(RequiredResources rr : step.requiredResourcesList) {
+			// create missing resources only when specified explicitly
+			String rsrcs = rr.getExpandedResources(env);
+			if(Util.fixEmpty(rsrcs) != null) {
+				for(String resource : Utils.splitLabels(rsrcs)) {
+					if(manager.createResource(resource)) {
+						listener.getLogger().println("Resource [" + rsrcs + "] did not exist. Created.");
+					}
+				}
+			}
+		}
 
-    @Override
-    public void stop(Throwable cause) throws Exception {
-        boolean cleaned = LockableResourcesManager.get().unqueueContext(getContext());
-        if(!cleaned) {
-            LOGGER.log(Level.WARNING, "Cannot remove context from lockable resource witing list. The context is not in the waiting list.");
-        }
-        getContext().onFailure(cause);
-    }
+		listener.getLogger().println("Trying to acquire lock on [" + step.requiredResourcesList + "]");
+		// Determine if there are enough resources available to proceed
+		// Function 'proceed' is called inside lock if execution is possible
+		// Else, the task is queued for later retry
+		LockableResourcesManager.get().lockOrQueueForLater(step, getContext());
+		return false; //asynchronous step execution
+	}
 
-    /**
-     * Since LockableResource contains transient variables, they cannot be correctly serialized
-     * Hence we use their unique resource names
-     *
-     * @param resourceNames
-     * @param requiredresources
-     * @param context
-     * @param inversePrecedence
-     */
-    public static void proceed(Collection<String> resourceNames, Collection<RequiredResources> requiredresources, StepContext context, boolean inversePrecedence) {
-        Run<?, ?> r;
-        try {
-            r = context.get(Run.class);
-            context.get(TaskListener.class).getLogger().println("Lock acquired on " + requiredresources);
-            context.get(TaskListener.class).getLogger().println("Lock resources " + resourceNames);
-        } catch(IOException | InterruptedException e) {
-            context.onFailure(e);
-            return;
-        }
-        LOGGER.finest("Lock acquired on " + resourceNames + " by " + r.getExternalizableId());
-        context.newBodyInvoker().
-                withCallback(new Callback(resourceNames, requiredresources, inversePrecedence)).
-                withDisplayName("Locking " + resourceNames).
-                start();
-    }
+	@Override
+	public void stop(Throwable cause) throws Exception {
+		boolean cleaned = LockableResourcesManager.get().unqueueContext(getContext());
+		if(!cleaned) {
+			LOGGER.log(Level.WARNING, "Cannot remove context from lockable resource witing list. The context is not in the waiting list.");
+		}
+		getContext().onFailure(cause);
+	}
 
-    private static final class Callback extends BodyExecutionCallback.TailCall {
-        private static final long serialVersionUID = 1L;
-        private final Collection<String> resourceNames;
-        private final boolean inversePrecedence;
-        private final Collection<RequiredResources> requiredresources;
+	/**
+	 * Since LockableResource contains transient variables, they cannot be correctly serialized
+	 * Hence we use their unique resource names
+	 *
+	 * @param resourceNames
+	 * @param requiredresources
+	 * @param context
+	 * @param inversePrecedence
+	 */
+	public static void proceed(Collection<String> resourceNames, Collection<RequiredResources> requiredresources, StepContext context, boolean inversePrecedence) {
+		Run<?, ?> r;
+		try {
+			r = context.get(Run.class);
+			context.get(TaskListener.class).getLogger().println("Lock acquired on " + requiredresources);
+			context.get(TaskListener.class).getLogger().println("Lock resources " + resourceNames);
+		} catch(IOException | InterruptedException e) {
+			context.onFailure(e);
+			return;
+		}
+		LOGGER.finest("Lock acquired on " + resourceNames + " by " + r.getExternalizableId());
+		context.newBodyInvoker().
+		withCallback(new Callback(resourceNames, requiredresources, inversePrecedence)).
+		withDisplayName("Locking " + resourceNames).
+		start();
+	}
 
-        Callback(Collection<String> resourceNames, Collection<RequiredResources> requiredresources, boolean inversePrecedence) {
-            this.resourceNames = resourceNames;
-            this.inversePrecedence = inversePrecedence;
-            this.requiredresources = requiredresources;
-        }
+	private static final class Callback extends BodyExecutionCallback.TailCall {
+		private static final long serialVersionUID = 1L;
+		private final Collection<String> resourceNames;
+		private final boolean inversePrecedence;
+		private final Collection<RequiredResources> requiredresources;
 
-        @Override
-        protected void finished(StepContext context) throws Exception {
-            LockableResourcesManager manager = LockableResourcesManager.get();
-            Set<LockableResource> resources = manager.getResourcesFromNames(resourceNames);
-            Run<?, ?> build = context.get(Run.class);
-            if(build == null) {
-                LOGGER.warning("No valid build during resources unlocking: may lead to blocked resources");
-            } else {
-                manager.unlock(resources, build, context, inversePrecedence);
-            }
-            context.get(TaskListener.class).getLogger().println("Lock released on " + requiredresources);
-            context.get(TaskListener.class).getLogger().println("Unlock resources " + resourceNames);
-            LOGGER.finest("Lock released on " + resources);
-        }
-    }
+		Callback(Collection<String> resourceNames, Collection<RequiredResources> requiredresources, boolean inversePrecedence) {
+			this.resourceNames = resourceNames;
+			this.inversePrecedence = inversePrecedence;
+			this.requiredresources = requiredresources;
+		}
+
+		@Override
+		protected void finished(StepContext context) throws Exception {
+			LockableResourcesManager manager = LockableResourcesManager.get();
+			Set<LockableResource> resources = manager.getResourcesFromNames(resourceNames);
+			Run<?, ?> build = context.get(Run.class);
+			if(build == null) {
+				LOGGER.warning("No valid build during resources unlocking: may lead to blocked resources");
+			} else {
+				manager.unlock(resources, build, context, inversePrecedence);
+			}
+			context.get(TaskListener.class).getLogger().println("Lock released on " + requiredresources);
+			context.get(TaskListener.class).getLogger().println("Unlock resources " + resourceNames);
+			LOGGER.finest("Lock released on " + resources);
+		}
+	}
 }
