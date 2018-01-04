@@ -22,17 +22,17 @@ import edu.umd.cs.findbugs.annotations.CheckForNull;
 public class LockStep extends AbstractStepImpl implements Serializable {
 
 	@CheckForNull
-	private String resource = null;
+	public String resource = null;
 
 	@CheckForNull
-	private String label = null;
+	public String label = null;
 
-	private int quantity = 0;
+	public int quantity = 0;
 
 	public boolean inversePrecedence = false;
 
 	@CheckForNull
-	private List<LockStepResource> extra = null;
+	public List<LockStepResource> extra = null;
 
 	// it should be LockStep() - without params. But keeping this for backward compatibility
 	// so `lock('resource1')` still works and `lock(label: 'label1', quantity: 3)` works too (resource is not required)
@@ -118,11 +118,11 @@ public class LockStep extends AbstractStepImpl implements Serializable {
 	public void validate() throws Exception {
 		LockStepResource.validate(resource, label, quantity);
 	}
-	
+
 	public List<LockStepResource> getResources() {
 		List<LockStepResource> resources = new ArrayList<>();
 		resources.add(new LockStepResource(resource, label, quantity));
-		
+
 		if (extra != null) {
 			resources.addAll(extra);
 		}
