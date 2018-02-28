@@ -217,6 +217,7 @@ public class LockStepTest {
 				// Ensure that b2 reaches the lock before b3
 				story.j.waitForMessage("[Label: label1, Quantity: 2] is locked, waiting...", b2);
 				story.j.waitForMessage("Found 0 available resource(s). Waiting for correct amount: 2.", b2);
+				isPaused(b2, 1, 1);
 
 				WorkflowJob p3 = story.j.jenkins.createProject(WorkflowJob.class, "p3");
 				p3.setDefinition(new CpsFlowDefinition(
@@ -228,19 +229,23 @@ public class LockStepTest {
 				WorkflowRun b3 = p3.scheduleBuild2(0).waitForStart();
 				story.j.waitForMessage("[Label: label1, Quantity: 1] is locked, waiting...", b3);
 				story.j.waitForMessage("Found 0 available resource(s). Waiting for correct amount: 1.", b3);
+				isPaused(b3, 1, 1);
 
 				// Unlock Label: label1
 				SemaphoreStep.success("wait-inside/1", null);
 				story.j.waitForMessage("Lock released on resource [Label: label1]", b1);
+				isPaused(b1, 1, 0);
 
 				// Both get their lock
 				story.j.waitForMessage("Lock acquired on [Label: label1, Quantity: 2]", b2);
 				story.j.waitForMessage("Lock acquired on [Label: label1, Quantity: 1]", b3);
-				
+
 				SemaphoreStep.success("wait-inside-quantity2/1", null);
 				SemaphoreStep.success("wait-inside-quantity1/1", null);
 				story.j.waitForMessage("Finish", b2);
 				story.j.waitForMessage("Finish", b3);
+				isPaused(b2, 1, 0);
+				isPaused(b3, 1, 0);
 			}
 		});
 	}
@@ -909,7 +914,8 @@ public class LockStepTest {
 				));
 				WorkflowRun b2 = p2.scheduleBuild2(0).waitForStart();
 				story.j.waitForMessage("[resource1] is locked, waiting...", b2);
-				
+				isPaused(b2, 1, 1);
+
 				WorkflowJob p3 = story.j.jenkins.createProject(WorkflowJob.class, "p3");
 				p3.setDefinition(new CpsFlowDefinition(
 						"lock('resource2') {\n" +
@@ -919,19 +925,23 @@ public class LockStepTest {
 				));
 				WorkflowRun b3 = p3.scheduleBuild2(0).waitForStart();
 				story.j.waitForMessage("[resource2] is locked, waiting...", b3);
+				isPaused(b3, 1, 1);
 
 				// Unlock resources
 				SemaphoreStep.success("wait-inside/1", null);
 				story.j.waitForMessage("Lock released on resource [{resource1},{resource2},]", b1);
+				isPaused(b1, 1, 0);
 
 				// Both get their lock
 				story.j.waitForMessage("Lock acquired on [resource1]", b2);
 				story.j.waitForMessage("Lock acquired on [resource2]", b3);
-				
+
 				SemaphoreStep.success("wait-inside-p2/1", null);
 				SemaphoreStep.success("wait-inside-p3/1", null);
 				story.j.waitForMessage("Finish", b2);
 				story.j.waitForMessage("Finish", b3);
+				isPaused(b2, 1, 0);
+				isPaused(b3, 1, 0);
 			}
 		});
 	}
@@ -963,7 +973,8 @@ public class LockStepTest {
 				));
 				WorkflowRun b2 = p2.scheduleBuild2(0).waitForStart();
 				story.j.waitForMessage("[resource1] is locked, waiting...", b2);
-				
+				isPaused(b2, 1, 1);
+
 				WorkflowJob p3 = story.j.jenkins.createProject(WorkflowJob.class, "p3");
 				p3.setDefinition(new CpsFlowDefinition(
 						"lock(label: 'label1') {\n" +
@@ -973,19 +984,23 @@ public class LockStepTest {
 				));
 				WorkflowRun b3 = p3.scheduleBuild2(0).waitForStart();
 				story.j.waitForMessage("[Label: label1] is locked, waiting...", b3);
+				isPaused(b3, 1, 1);
 
 				// Unlock resources
 				SemaphoreStep.success("wait-inside/1", null);
 				story.j.waitForMessage("Lock released on resource [{Label: label1},{resource1},]", b1);
+				isPaused(b2, 1, 0);
 
 				// Both get their lock
 				story.j.waitForMessage("Lock acquired on [resource1]", b2);
 				story.j.waitForMessage("Lock acquired on [Label: label1]", b3);
-				
+
 				SemaphoreStep.success("wait-inside-p2/1", null);
 				SemaphoreStep.success("wait-inside-p3/1", null);
 				story.j.waitForMessage("Finish", b2);
 				story.j.waitForMessage("Finish", b3);
+				isPaused(b2, 1, 0);
+				isPaused(b3, 1, 0);
 			}
 		});
 	}
@@ -1017,7 +1032,8 @@ public class LockStepTest {
 				));
 				WorkflowRun b2 = p2.scheduleBuild2(0).waitForStart();
 				story.j.waitForMessage("[resource1] is locked, waiting...", b2);
-				
+				isPaused(b2, 1, 1);
+
 				WorkflowJob p3 = story.j.jenkins.createProject(WorkflowJob.class, "p3");
 				p3.setDefinition(new CpsFlowDefinition(
 						"lock(label: 'label1') {\n" +
@@ -1027,18 +1043,22 @@ public class LockStepTest {
 				));
 				WorkflowRun b3 = p3.scheduleBuild2(0).waitForStart();
 				story.j.waitForMessage("[Label: label1] is locked, waiting...", b3);
+				isPaused(b3, 1, 1);
 
 				// Unlock resources
 				SemaphoreStep.success("wait-inside/1", null);
 				story.j.waitForMessage("Lock released on resource [{Label: label1},{resource1},]", b1);
+				isPaused(b1, 1, 0);
 
 				// #2 gets the lock before #3 (in the order as they requested the lock)
 				story.j.waitForMessage("Lock acquired on [resource1]", b2);
 				SemaphoreStep.success("wait-inside-p2/1", null);
 				story.j.waitForMessage("Finish", b2);
+				isPaused(b2, 1, 0);
 				story.j.waitForMessage("Lock acquired on [Label: label1]", b3);
 				SemaphoreStep.success("wait-inside-p3/1", null);
 				story.j.waitForMessage("Finish", b3);
+				isPaused(b3, 1, 0);
 			}
 		});
 	}
@@ -1054,7 +1074,10 @@ public class LockStepTest {
 				LockableResourcesManager.get().createResourceWithLabel("resource4", "label1");
 				WorkflowJob p = story.j.jenkins.createProject(WorkflowJob.class, "p");
 				p.setDefinition(new CpsFlowDefinition(
-						"lock(resource: 'resource4', extra: [[resource: 'resource2'], [label: 'label1', quantity: 2]]) {\n" +
+						"lock(resource: 'resource4', variable: 'var', extra: [[resource: 'resource2'], [label: 'label1', quantity: 2]]) {\n" +
+						"	def lockedResources = env.var.split(',')\n" +
+						"	Arrays.sort(lockedResources)\n" +
+						"	echo \"Resources locked: ${lockedResources}\"\n" +
 						"	semaphore 'wait-inside'\n" +
 						"}\n" +
 						"echo 'Finish'"
@@ -1065,7 +1088,10 @@ public class LockStepTest {
 
 				WorkflowJob p2 = story.j.jenkins.createProject(WorkflowJob.class, "p2");
 				p2.setDefinition(new CpsFlowDefinition(
-						"lock(label: 'label1', quantity: 3) {\n" +
+						"lock(label: 'label1', variable: 'var', quantity: 3) {\n" +
+						"	def lockedResources = env.var.split(',')\n" +
+						"	Arrays.sort(lockedResources)\n" +
+						"	echo \"Resources locked: ${lockedResources}\"\n" +
 						"	semaphore 'wait-inside-quantity3'\n" +
 						"}\n" +
 						"echo 'Finish'"
@@ -1073,10 +1099,14 @@ public class LockStepTest {
 				WorkflowRun b2 = p2.scheduleBuild2(0).waitForStart();
 				story.j.waitForMessage("[Label: label1, Quantity: 3] is locked, waiting...", b2);
 				story.j.waitForMessage("Found 2 available resource(s). Waiting for correct amount: 3.", b2);
-				
+				isPaused(b2, 1, 1);
+
 				WorkflowJob p3 = story.j.jenkins.createProject(WorkflowJob.class, "p3");
 				p3.setDefinition(new CpsFlowDefinition(
-						"lock(label: 'label1', quantity: 2) {\n" +
+						"lock(label: 'label1', variable: 'var', quantity: 2) {\n" +
+						"	def lockedResources = env.var.split(',')\n" +
+						"	Arrays.sort(lockedResources)\n" +
+						"	echo \"Resources locked: ${lockedResources}\"\n" +
 						"	semaphore 'wait-inside-quantity2'\n" +
 						"}\n" +
 						"echo 'Finish'"
@@ -1087,15 +1117,22 @@ public class LockStepTest {
 				// Let 3 finish
 				SemaphoreStep.success("wait-inside-quantity2/1", null);
 				story.j.waitForMessage("Finish", b3);
+				story.j.assertLogContains("Resources locked: [resource1, resource3]", b3);
+				isPaused(b3, 1, 0);
 
 				// Unlock resources
 				SemaphoreStep.success("wait-inside/1", null);
 				story.j.waitForMessage("Lock released on resource [{resource4},{resource2},{Label: label1, Quantity: 2},]", b1);
+				story.j.assertLogContains("Resources locked: [resource2, resource4]", b1);
+				isPaused(b1, 1, 0);
 
 				// #2 gets the lock
 				story.j.waitForMessage("Lock acquired on [Label: label1, Quantity: 3]", b2);
 				SemaphoreStep.success("wait-inside-quantity3/1", null);
 				story.j.waitForMessage("Finish", b2);
+				// Could be any 3 resources, so just check the beginning of the message
+				story.j.assertLogContains("Resources locked: [resource", b2);
+				isPaused(b2, 1, 0);
 			}
 		});
 	}
